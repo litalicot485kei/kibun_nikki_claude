@@ -72,9 +72,29 @@ const normalizeSliderValue = (value, fallback = 5) => {
 
 const LS_KEY = "healthdb_v2";
 const GK_KEY = "gemini_key_v2";
+const AI_PROMPT_KEY = "gemini_prompt_v1";
+const AI_OUTPUT_KEY = "gemini_output_v1";
+const AI_OUTPUT_DEFAULT = "ここにAIの解析結果が表示されます。";
 const EMPTY_FORM = {
   mind: 5, body: 5, headache: false, nausea: false, nap: false,
   sleepStart: "", sleepEnd: "", sleepHours: "", sleepScore: 50, sweetCount: 0, summary: ""
+};
+
+const readAIState = () => ({
+  apiKey: localStorage.getItem(GK_KEY) || "",
+  prompt: localStorage.getItem(AI_PROMPT_KEY) || "",
+  output: localStorage.getItem(AI_OUTPUT_KEY) || "",
+});
+
+const writeAIState = ({ apiKey = "", prompt = "", output = "" } = {}) => {
+  if (apiKey) localStorage.setItem(GK_KEY, apiKey);
+  else localStorage.removeItem(GK_KEY);
+
+  if (prompt) localStorage.setItem(AI_PROMPT_KEY, prompt);
+  else localStorage.removeItem(AI_PROMPT_KEY);
+
+  if (output && output !== AI_OUTPUT_DEFAULT) localStorage.setItem(AI_OUTPUT_KEY, output);
+  else localStorage.removeItem(AI_OUTPUT_KEY);
 };
 
 // ── responsive hook ────────────────────────────────────
@@ -532,14 +552,32 @@ const PRESETS = [
 const AITab = ({ db, isMobile }) => {
   const [apiKey,   setApiKey]   = useState(() => localStorage.getItem(GK_KEY) || "");
   const [keySaved, setKeySaved] = useState(false);
-  const [prompt,   setPrompt]   = useState("");
-  const [output,   setOutput]   = useState("ここにAIの解析結果が表示されます。");
+  const [prompt,   setPrompt]   = useState(() => localStorage.getItem(AI_PROMPT_KEY) || "");
+  const [output,   setOutput]   = useState(() => localStorage.getItem(AI_OUTPUT_KEY) || AI_OUTPUT_DEFAULT);
   const [loading,  setLoading]  = useState(false);
 
   const saveKey = () => {
     localStorage.setItem(GK_KEY, apiKey);
     setKeySaved(true); setTimeout(() => setKeySaved(false), 2000);
   };
+
+  useEffect(() => {
+    if (apiKey.trim()) localStorage.setItem(GK_KEY, apiKey);
+    else localStorage.removeItem(GK_KEY);
+  }, [apiKey]);
+
+  useEffect(() => {
+    if (prompt.trim()) localStorage.setItem(AI_PROMPT_KEY, prompt);
+    else localStorage.removeItem(AI_PROMPT_KEY);
+  }, [prompt]);
+
+  useEffect(() => {
+    if (output && output !== AI_OUTPUT_DEFAULT) {
+      localStorage.setItem(AI_OUTPUT_KEY, output);
+    } else {
+      localStorage.removeItem(AI_OUTPUT_KEY);
+    }
+  }, [output]);
 
   const callGemini = async (p) => {
     if (!apiKey) { setOutput("Gemini APIキーを入力してください。"); return; }
@@ -628,7 +666,13 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
     Object.values(db).sort((a, b) => a.date < b.date ? -1 : 1).reverse(), [db]);
 
   const exportJSON = () => {
-    const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
+    const ai = readAIState();
+    const payload = {
+      version: 2,
+      db,
+      ai,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = `health_journal_${todayStr()}.json`; a.click();
   };
@@ -639,9 +683,15 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
     reader.onload = (ev) => {
       try {
         const data = JSON.parse(ev.target.result);
-        const next = { ...db, ...data };
+        const importedDb = data?.db && typeof data.db === "object" ? data.db : data;
+        const next = { ...db, ...importedDb };
         setDb(next); localStorage.setItem(LS_KEY, JSON.stringify(next));
-        toast(`${Object.keys(data).length}件のデータを読み込みました`);
+
+        if (data?.ai && typeof data.ai === "object") {
+          writeAIState(data.ai);
+        }
+
+        toast(`${Object.keys(importedDb).length}件のデータを読み込みました`);
       } catch { toast("JSONの読み込みに失敗しました"); }
       e.target.value = "";
     };
@@ -657,7 +707,12 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
 
   const clearAll = () => {
     if (!confirm("全データを削除します。この操作は取り消せません。")) return;
-    setDb({}); localStorage.removeItem(LS_KEY); toast("全データを削除しました");
+    setDb({});
+    localStorage.removeItem(LS_KEY);
+    localStorage.removeItem(GK_KEY);
+    localStorage.removeItem(AI_PROMPT_KEY);
+    localStorage.removeItem(AI_OUTPUT_KEY);
+    toast("全データを削除しました");
   };
 
   const importCard = (
