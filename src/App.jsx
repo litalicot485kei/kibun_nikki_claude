@@ -91,6 +91,17 @@ const readAIState = () => ({
   })(),
 });
 
+const escapeCsv = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+const downloadTextFile = (filename, content, type = "text/plain;charset=utf-8") => {
+  const blob = new Blob([content], { type });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
 const writeAIState = ({ apiKey = "", prompt = "", output = "", history = [] } = {}) => {
   if (apiKey) localStorage.setItem(GK_KEY, apiKey);
   else localStorage.removeItem(GK_KEY);
@@ -605,6 +616,22 @@ const AITab = ({ db, isMobile }) => {
     setHistory((prev) => [item, ...prev].slice(0, 50));
   };
 
+  const exportHistoryCSV = () => {
+    if (!history.length) return;
+    const header = ["savedAt", "prompt", "output"];
+    const rows = history.map((item) => [item.savedAt, item.prompt, item.output]);
+    const csv = [header, ...rows]
+      .map((row) => row.map(escapeCsv).join(","))
+      .join("\n");
+    downloadTextFile(`gemini_history_${todayStr()}.csv`, csv, "text/csv;charset=utf-8");
+  };
+
+  const clearHistory = () => {
+    if (!confirm("AI解析履歴を削除しますか？")) return;
+    setHistory([]);
+    localStorage.removeItem(AI_HISTORY_KEY);
+  };
+
   const callGemini = async (p) => {
     if (!apiKey) { setOutput("Gemini APIキーを入力してください。"); return; }
     const entries = Object.values(db).sort((a, b) => a.date < b.date ? -1 : 1).slice(-30);
@@ -675,7 +702,13 @@ const AITab = ({ db, isMobile }) => {
       }}>{output}</div>
       {history.length > 0 && (
         <div style={{ marginTop: "1rem" }}>
-          <CardTitle>解析履歴</CardTitle>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+            <CardTitle>解析履歴</CardTitle>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Btn onClick={exportHistoryCSV} small>CSV保存</Btn>
+              <Btn onClick={clearHistory} danger small>履歴削除</Btn>
+            </div>
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {history.slice(0, isMobile ? 3 : 5).map((item, index) => (
               <div key={`${item.savedAt}-${index}`} style={{
@@ -721,7 +754,7 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
   const exportJSON = () => {
     const ai = readAIState();
     const payload = {
-      version: 2,
+      version: 3,
       db,
       ai,
     };
