@@ -74,6 +74,7 @@ const LS_KEY = "healthdb_v2";
 const GK_KEY = "gemini_key_v2";
 const AI_PROMPT_KEY = "gemini_prompt_v1";
 const AI_OUTPUT_KEY = "gemini_output_v1";
+const AI_HISTORY_KEY = "gemini_history_v1";
 const AI_OUTPUT_DEFAULT = "ここにAIの解析結果が表示されます。";
 const EMPTY_FORM = {
   mind: 5, body: 5, headache: false, nausea: false, nap: false,
@@ -84,9 +85,13 @@ const readAIState = () => ({
   apiKey: localStorage.getItem(GK_KEY) || "",
   prompt: localStorage.getItem(AI_PROMPT_KEY) || "",
   output: localStorage.getItem(AI_OUTPUT_KEY) || "",
+  history: (() => {
+    try { return JSON.parse(localStorage.getItem(AI_HISTORY_KEY) || "[]"); }
+    catch { return []; }
+  })(),
 });
 
-const writeAIState = ({ apiKey = "", prompt = "", output = "" } = {}) => {
+const writeAIState = ({ apiKey = "", prompt = "", output = "", history = [] } = {}) => {
   if (apiKey) localStorage.setItem(GK_KEY, apiKey);
   else localStorage.removeItem(GK_KEY);
 
@@ -95,6 +100,9 @@ const writeAIState = ({ apiKey = "", prompt = "", output = "" } = {}) => {
 
   if (output && output !== AI_OUTPUT_DEFAULT) localStorage.setItem(AI_OUTPUT_KEY, output);
   else localStorage.removeItem(AI_OUTPUT_KEY);
+
+  if (Array.isArray(history) && history.length) localStorage.setItem(AI_HISTORY_KEY, JSON.stringify(history));
+  else localStorage.removeItem(AI_HISTORY_KEY);
 };
 
 // ── responsive hook ────────────────────────────────────
@@ -554,6 +562,10 @@ const AITab = ({ db, isMobile }) => {
   const [keySaved, setKeySaved] = useState(false);
   const [prompt,   setPrompt]   = useState(() => localStorage.getItem(AI_PROMPT_KEY) || "");
   const [output,   setOutput]   = useState(() => localStorage.getItem(AI_OUTPUT_KEY) || AI_OUTPUT_DEFAULT);
+  const [history,  setHistory]  = useState(() => {
+    try { return JSON.parse(localStorage.getItem(AI_HISTORY_KEY) || "[]"); }
+    catch { return []; }
+  });
   const [loading,  setLoading]  = useState(false);
 
   const saveKey = () => {
@@ -579,6 +591,20 @@ const AITab = ({ db, isMobile }) => {
     }
   }, [output]);
 
+  useEffect(() => {
+    if (history.length) localStorage.setItem(AI_HISTORY_KEY, JSON.stringify(history));
+    else localStorage.removeItem(AI_HISTORY_KEY);
+  }, [history]);
+
+  const appendHistory = (nextOutput, nextPrompt = prompt) => {
+    const item = {
+      savedAt: new Date().toISOString(),
+      prompt: nextPrompt,
+      output: nextOutput,
+    };
+    setHistory((prev) => [item, ...prev].slice(0, 50));
+  };
+
   const callGemini = async (p) => {
     if (!apiKey) { setOutput("Gemini APIキーを入力してください。"); return; }
     const entries = Object.values(db).sort((a, b) => a.date < b.date ? -1 : 1).slice(-30);
@@ -593,7 +619,9 @@ const AITab = ({ db, isMobile }) => {
       );
       if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || res.statusText); }
       const d = await res.json();
-      setOutput(d.candidates?.[0]?.content?.parts?.[0]?.text || "応答が空でした。");
+      const nextOutput = d.candidates?.[0]?.content?.parts?.[0]?.text || "応答が空でした。";
+      setOutput(nextOutput);
+      appendHistory(nextOutput, p);
     } catch (e) { setOutput("エラー: " + e.message); }
     finally { setLoading(false); }
   };
@@ -645,6 +673,31 @@ const AITab = ({ db, isMobile }) => {
         color: loading ? "var(--color-text-tertiary)" : "var(--color-text-primary)",
         whiteSpace: "pre-wrap",
       }}>{output}</div>
+      {history.length > 0 && (
+        <div style={{ marginTop: "1rem" }}>
+          <CardTitle>解析履歴</CardTitle>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {history.slice(0, isMobile ? 3 : 5).map((item, index) => (
+              <div key={`${item.savedAt}-${index}`} style={{
+                border: "0.5px solid var(--color-border-tertiary)",
+                borderRadius: 8,
+                padding: "10px 12px",
+                background: "var(--color-background-secondary)",
+              }}>
+                <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginBottom: 4 }}>
+                  {new Date(item.savedAt).toLocaleString("ja-JP")}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
+                  {item.prompt || "（質問なし）"}
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                  {item.output}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </Card>
   );
 
@@ -712,6 +765,7 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
     localStorage.removeItem(GK_KEY);
     localStorage.removeItem(AI_PROMPT_KEY);
     localStorage.removeItem(AI_OUTPUT_KEY);
+    localStorage.removeItem(AI_HISTORY_KEY);
     toast("全データを削除しました");
   };
 
