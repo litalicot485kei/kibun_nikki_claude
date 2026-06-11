@@ -629,7 +629,13 @@ const AITab = ({ db, isMobile }) => {
   const clearHistory = () => {
     if (!confirm("AI解析履歴を削除しますか？")) return;
     setHistory([]);
+    setOutput(AI_OUTPUT_DEFAULT);
     localStorage.removeItem(AI_HISTORY_KEY);
+    localStorage.removeItem(AI_OUTPUT_KEY);
+  };
+
+  const deleteHistoryItem = (savedAt) => {
+    setHistory((prev) => prev.filter((item) => item.savedAt !== savedAt));
   };
 
   const callGemini = async (p) => {
@@ -703,28 +709,33 @@ const AITab = ({ db, isMobile }) => {
       {history.length > 0 && (
         <div style={{ marginTop: "1rem" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
-            <CardTitle>解析履歴</CardTitle>
+            <CardTitle>会話履歴</CardTitle>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Btn onClick={exportHistoryCSV} small>CSV保存</Btn>
               <Btn onClick={clearHistory} danger small>履歴削除</Btn>
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: isMobile ? 380 : 460, overflowY: "auto", paddingRight: 4 }}>
             {history.slice(0, isMobile ? 3 : 5).map((item, index) => (
               <div key={`${item.savedAt}-${index}`} style={{
                 border: "0.5px solid var(--color-border-tertiary)",
                 borderRadius: 8,
-                padding: "10px 12px",
+                padding: "10px 12px 12px",
                 background: "var(--color-background-secondary)",
               }}>
-                <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginBottom: 4 }}>
-                  {new Date(item.savedAt).toLocaleString("ja-JP")}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>
+                    {new Date(item.savedAt).toLocaleString("ja-JP")}
+                  </div>
+                  <Btn onClick={() => deleteHistoryItem(item.savedAt)} danger small>削除</Btn>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-                  {item.prompt || "（質問なし）"}
-                </div>
-                <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
-                  {item.output}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ alignSelf: "flex-end", maxWidth: "92%", background: "#185FA5", color: "#fff", borderRadius: 16, borderTopRightRadius: 4, padding: "10px 12px", fontSize: 13, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                    {item.prompt || "（質問なし）"}
+                  </div>
+                  <div style={{ alignSelf: "flex-start", maxWidth: "92%", background: "var(--color-background-primary)", color: "var(--color-text-primary)", borderRadius: 16, borderTopLeftRadius: 4, padding: "10px 12px", fontSize: 13, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                    {item.output}
+                  </div>
                 </div>
               </div>
             ))}
