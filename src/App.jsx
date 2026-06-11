@@ -269,8 +269,8 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
 
   const summaryCard = (
     <Card>
-      <CardTitle>今日のまとめ</CardTitle>
-      <Textarea value={form.summary} onChange={upd("summary")} placeholder="今日を振り返って..." rows={isMobile ? 4 : 6} />
+      <CardTitle>昨日のまとめ</CardTitle>
+      <Textarea value={form.summary} onChange={upd("summary")} placeholder="昨日を振り返って..." rows={isMobile ? 4 : 6} />
     </Card>
   );
 
@@ -495,10 +495,10 @@ const GraphTab = ({ db, isMobile }) => {
 
 // ── AI TAB ─────────────────────────────────────────────
 const PRESETS = [
-  { label: "全体サマリー", prompt: "全体的な健康状態のサマリーと気になる点を教えてください。" },
-  { label: "睡眠分析",     prompt: "睡眠パターンを分析し、改善アドバイスをください。" },
-  { label: "症状と相関",   prompt: "頭痛や吐き気などの症状と睡眠・食事の相関を分析してください。" },
-  { label: "傾向と提案",   prompt: "最近の傾向と今後1週間のアドバイスをください。" },
+  { label: "昨日の全体サマリー", prompt: "昨日までの全体的な健康状態のサマリーと気になる点を教えてください。" },
+  { label: "昨日の睡眠分析",     prompt: "昨日の睡眠パターンを分析し、改善アドバイスをください。" },
+  { label: "昨日の症状と相関",   prompt: "昨日の頭痛や吐き気などの症状と睡眠・食事の相関を分析してください。" },
+  { label: "昨日の傾向と提案",   prompt: "昨日までの傾向と今後1週間のアドバイスをください。" },
 ];
 
 const AITab = ({ db, isMobile }) => {
