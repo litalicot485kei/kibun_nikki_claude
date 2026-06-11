@@ -18,6 +18,13 @@ const calcSleepHours = (start, end) => {
   return parseFloat((diff / 60).toFixed(2));
 };
 
+const normalizeSleepHours = (value) => {
+  if (value === "" || value == null) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, parseFloat(parsed.toFixed(2)));
+};
+
 const fmtSleep = (h) => {
   if (h == null) return "—";
   const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
@@ -67,7 +74,7 @@ const LS_KEY = "healthdb_v2";
 const GK_KEY = "gemini_key_v2";
 const EMPTY_FORM = {
   mind: 5, body: 5, headache: false, nausea: false, nap: false,
-  sleepStart: "", sleepEnd: "", sleepScore: 50, sweetCount: 0, summary: ""
+  sleepStart: "", sleepEnd: "", sleepHours: "", sleepScore: 50, sweetCount: 0, summary: ""
 };
 
 // ── responsive hook ────────────────────────────────────
@@ -189,9 +196,14 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
         ...db[today],
         mind: normalizeSliderValue(db[today].mind),
         body: normalizeSliderValue(db[today].body),
+        sleepHours: db[today].sleepHours ?? calcSleepHours(db[today].sleepStart, db[today].sleepEnd) ?? "",
       }
     : { ...EMPTY_FORM });
-  const sleepH = useMemo(() => calcSleepHours(form.sleepStart, form.sleepEnd), [form.sleepStart, form.sleepEnd]);
+  const sleepH = useMemo(() => {
+    const manualSleep = normalizeSleepHours(form.sleepHours);
+    if (manualSleep != null) return manualSleep;
+    return calcSleepHours(form.sleepStart, form.sleepEnd);
+  }, [form.sleepStart, form.sleepEnd, form.sleepHours]);
   const sl = scoreLabel(form.sleepScore);
   const feeling = feelingLabel(form.mind);
   const bodyFeeling = feelingLabel(form.body);
@@ -200,7 +212,8 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
   const upd = (k) => (e) => setForm(f => ({ ...f, [k]: e.target ? e.target.value : e }));
 
   const save = () => {
-    const entry = { ...form, date: today, sleepHours: sleepH, savedAt: new Date().toISOString() };
+    const entrySleepHours = normalizeSleepHours(form.sleepHours);
+    const entry = { ...form, date: today, sleepHours: entrySleepHours ?? sleepH, savedAt: new Date().toISOString() };
     const next = { ...db, [today]: entry };
     setDb(next);
     localStorage.setItem(LS_KEY, JSON.stringify(next));
@@ -287,6 +300,21 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
       }}>
         睡眠時間：<span style={{ fontSize: 18, fontWeight: 500, color: "var(--color-text-primary)" }}>{fmtSleep(sleepH)}</span>
       </div>
+      <Field label="睡眠時間（実際に眠っていた時間）">
+        <input
+          className="app-control"
+          type="number"
+          min={0}
+          step={0.1}
+          value={form.sleepHours}
+          onChange={upd("sleepHours")}
+          placeholder="例: 7.5"
+          style={{ ...inputStyle, width: 120 }}
+        />
+        <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 4 }}>
+          就寝・起床時刻は参考用です。空欄なら時刻差から自動計算します。
+        </div>
+      </Field>
       <Field label="睡眠スコア" style={{ marginBottom: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <input className="app-range" type="range" min={0} max={100} step={1} value={form.sleepScore}
