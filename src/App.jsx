@@ -25,16 +25,46 @@ const fmtSleep = (h) => {
 };
 
 const scoreLabel = (v) => {
-  if (v >= 80) return { text: "良好",     bg: "#EAF3DE", col: "#3B6D11" };
-  if (v >= 60) return { text: "まあまあ", bg: "#FAEEDA", col: "#854F0B" };
-  if (v >= 40) return { text: "普通",     bg: "#E6F1FB", col: "#185FA5" };
-  return             { text: "悪い",     bg: "#FCEBEB", col: "#A32D2D" };
+  if (v >= 90) return { text: "とてもいい", bg: "#EAF3DE", col: "#3B6D11" };
+  if (v >= 80) return { text: "まあまあいい", bg: "#E6F1FB", col: "#185FA5" };
+  if (v >= 60) return { text: "普通",       bg: "#FAEEDA", col: "#854F0B" };
+  return             { text: "悪い",       bg: "#FCEBEB", col: "#A32D2D" };
+};
+
+const feelingLabel = (v) => {
+  if (v >= 9) return { text: "とても良い", bg: "#EAF3DE", col: "#3B6D11" };
+  if (v >= 7) return { text: "良い",       bg: "#E6F1FB", col: "#185FA5" };
+  if (v >= 5) return { text: "ふつう",     bg: "#FAEEDA", col: "#854F0B" };
+  if (v >= 3) return { text: "つらい",     bg: "#FBEED9", col: "#A86400" };
+  return             { text: "かなりつらい", bg: "#FCEBEB", col: "#A32D2D" };
+};
+
+const badgeStyle = (bg, col, width = 108) => ({
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minWidth: width,
+  padding: "3px 11px",
+  borderRadius: 20,
+  fontSize: 13,
+  fontWeight: 500,
+  background: bg,
+  color: col,
+  whiteSpace: "nowrap",
+  boxSizing: "border-box",
+});
+
+const normalizeSliderValue = (value, fallback = 5) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  const normalized = parsed > 10 ? Math.round(parsed / 10) : Math.round(parsed);
+  return Math.max(1, Math.min(10, normalized));
 };
 
 const LS_KEY = "healthdb_v2";
 const GK_KEY = "gemini_key_v2";
 const EMPTY_FORM = {
-  mind: "", body: "", headache: false, nausea: false, nap: false,
+  mind: 5, body: 5, headache: false, nausea: false, nap: false,
   sleepStart: "", sleepEnd: "", sleepScore: 50, sweetCount: 0, summary: ""
 };
 
@@ -142,9 +172,18 @@ const StatCard = ({ label, value, sub, accent }) => (
 // ── RECORD TAB ─────────────────────────────────────────
 const RecordTab = ({ db, setDb, toast, isMobile }) => {
   const today = todayStr();
-  const [form, setForm] = useState(() => db[today] ? { ...EMPTY_FORM, ...db[today] } : { ...EMPTY_FORM });
+  const [form, setForm] = useState(() => db[today]
+    ? {
+        ...EMPTY_FORM,
+        ...db[today],
+        mind: normalizeSliderValue(db[today].mind),
+        body: normalizeSliderValue(db[today].body),
+      }
+    : { ...EMPTY_FORM });
   const sleepH = useMemo(() => calcSleepHours(form.sleepStart, form.sleepEnd), [form.sleepStart, form.sleepEnd]);
   const sl = scoreLabel(form.sleepScore);
+  const feeling = feelingLabel(form.mind);
+  const bodyFeeling = feelingLabel(form.body);
   const saved = !!db[today];
 
   const upd = (k) => (e) => setForm(f => ({ ...f, [k]: e.target ? e.target.value : e }));
@@ -174,10 +213,36 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
     <Card>
       <CardTitle>心・体の状態</CardTitle>
       <Field label="心の状態">
-        <Textarea value={form.mind} onChange={upd("mind")} placeholder="今日の気分、感情など..." rows={isMobile ? 3 : 4} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <input
+            type="range"
+            min={1}
+            max={10}
+            step={1}
+            value={form.mind}
+            onChange={(e) => setForm(f => ({ ...f, mind: +e.target.value }))}
+            style={{ flex: 1 }}
+          />
+          <span style={badgeStyle(feeling.bg, feeling.col)}>
+            {form.mind}/10 · {feeling.text}
+          </span>
+        </div>
       </Field>
       <Field label="体の状態">
-        <Textarea value={form.body} onChange={upd("body")} placeholder="体の調子、疲れ具合など..." rows={isMobile ? 3 : 4} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <input
+            type="range"
+            min={1}
+            max={10}
+            step={1}
+            value={form.body}
+            onChange={(e) => setForm(f => ({ ...f, body: +e.target.value }))}
+            style={{ flex: 1 }}
+          />
+          <span style={badgeStyle(bodyFeeling.bg, bodyFeeling.col)}>
+            {form.body}/10 · {bodyFeeling.text}
+          </span>
+        </div>
       </Field>
       <Field label="症状" style={{ marginBottom: 0 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
