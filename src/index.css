@@ -1,18 +1,23 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
+  --text: #4f5666;
+  --text-h: #111827;
+  --bg: #f7f8fb;
+  --border: #d9dee8;
+  --code-bg: #eef2f8;
+  --accent: #185fa5;
+  --accent-bg: rgba(24, 95, 165, 0.1);
+  --accent-border: rgba(24, 95, 165, 0.35);
+  --social-bg: rgba(238, 242, 248, 0.75);
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --input-border-hover: #9fb3c8;
+  --input-shadow: rgba(15, 23, 42, 0.04);
+  --focus-ring: rgba(24, 95, 165, 0.18);
   --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+    rgba(15, 23, 42, 0.08) 0 10px 15px -3px, rgba(15, 23, 42, 0.04) 0 4px 6px -2px;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --sans: Inter, 'Segoe UI', Roboto, 'Noto Sans JP', sans-serif;
+  --heading: Inter, 'Segoe UI', Roboto, 'Noto Sans JP', sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
   font: 18px/145% var(--sans);
@@ -32,15 +37,20 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
+    --text: #a7b0bf;
+    --text-h: #f8fafc;
+    --bg: #111318;
+    --border: #2b313d;
+    --code-bg: #1b2029;
+    --accent: #60a5fa;
+    --accent-bg: rgba(96, 165, 250, 0.16);
+    --accent-border: rgba(96, 165, 250, 0.42);
+    --social-bg: rgba(31, 37, 48, 0.7);
+    --input-bg: #171b22;
+    --input-border: #343c4b;
+    --input-border-hover: #4a5568;
+    --input-shadow: rgba(0, 0, 0, 0.18);
+    --focus-ring: rgba(96, 165, 250, 0.18);
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
   }
@@ -52,6 +62,11 @@
 
 body {
   margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(24, 95, 165, 0.08), transparent 24%),
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.08), transparent 20%),
+    var(--bg);
+  color: var(--text);
 }
 
 #root {
@@ -108,4 +123,32 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+
+.app-control {
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  box-shadow: 0 1px 2px var(--input-shadow);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.app-control:hover {
+  border-color: var(--input-border-hover);
+}
+
+.app-control:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--focus-ring);
+}
+
+.app-control::placeholder {
+  color: var(--text);
+  opacity: 0.8;
+}
+
+.app-range {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
 }

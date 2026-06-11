@@ -39,11 +39,11 @@ const feelingLabel = (v) => {
   return             { text: "かなりつらい", bg: "#FCEBEB", col: "#A32D2D" };
 };
 
-const badgeStyle = (bg, col, width = 108) => ({
+const badgeStyle = (bg, col, width = 126) => ({
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  minWidth: width,
+  width,
   padding: "3px 11px",
   borderRadius: 20,
   fontSize: 13,
@@ -51,6 +51,8 @@ const badgeStyle = (bg, col, width = 108) => ({
   background: bg,
   color: col,
   whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
   boxSizing: "border-box",
 });
 
@@ -89,11 +91,14 @@ const useToast = () => {
 
 // ── design tokens ──────────────────────────────────────
 const inputStyle = {
-  width: "100%", fontSize: 14, padding: "8px 10px",
-  border: "0.5px solid var(--color-border-secondary)",
-  borderRadius: 8, background: "var(--color-background-secondary)",
-  color: "var(--color-text-primary)", fontFamily: "var(--font-sans)",
-  outline: "none", boxSizing: "border-box",
+  width: "100%",
+  fontSize: 14,
+  padding: "10px 12px",
+  borderRadius: 12,
+  color: "var(--color-text-primary)",
+  fontFamily: "var(--font-sans)",
+  outline: "none",
+  boxSizing: "border-box",
 };
 
 // ── base components ────────────────────────────────────
@@ -123,12 +128,18 @@ const Field = ({ label, children, style }) => (
 );
 
 const Textarea = ({ value, onChange, placeholder, rows = 3 }) => (
-  <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows}
-    style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
+  <textarea
+    className="app-control"
+    value={value}
+    onChange={onChange}
+    placeholder={placeholder}
+    rows={rows}
+    style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }}
+  />
 );
 
 const TimeInput = ({ value, onChange }) => (
-  <input type="time" value={value} onChange={onChange} style={inputStyle} />
+  <input className="app-control" type="time" value={value} onChange={onChange} style={inputStyle} />
 );
 
 const Toggle = ({ checked, onChange, label }) => (
@@ -215,6 +226,7 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
       <Field label="心の状態">
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <input
+            className="app-range"
             type="range"
             min={1}
             max={10}
@@ -231,6 +243,7 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
       <Field label="体の状態">
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <input
+            className="app-range"
             type="range"
             min={1}
             max={10}
@@ -274,12 +287,15 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
       }}>
         睡眠時間：<span style={{ fontSize: 18, fontWeight: 500, color: "var(--color-text-primary)" }}>{fmtSleep(sleepH)}</span>
       </div>
-      <Field label={`睡眠スコア — ${form.sleepScore}`} style={{ marginBottom: 0 }}>
+      <Field label="睡眠スコア" style={{ marginBottom: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <input type="range" min={0} max={100} step={1} value={form.sleepScore}
+          <input className="app-range" type="range" min={0} max={100} step={1} value={form.sleepScore}
             onChange={(e) => setForm(f => ({ ...f, sleepScore: +e.target.value }))}
             style={{ flex: 1 }} />
-          <span style={{ padding: "3px 11px", borderRadius: 20, fontSize: 13, fontWeight: 500, background: sl.bg, color: sl.col, whiteSpace: "nowrap" }}>
+          <span style={badgeStyle("var(--color-background-secondary)", "var(--color-text-primary)", 72)}>
+            {form.sleepScore}
+          </span>
+          <span style={badgeStyle(sl.bg, sl.col, 126)}>
             {sl.text}
           </span>
         </div>
@@ -292,7 +308,7 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
       <CardTitle>食事</CardTitle>
       <Field label="甘い食べ物・飲み物の数" style={{ marginBottom: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <input type="number" value={form.sweetCount} min={0} max={99}
+          <input className="app-control" type="number" value={form.sweetCount} min={0} max={99}
             onChange={(e) => setForm(f => ({ ...f, sweetCount: +e.target.value }))}
             style={{ ...inputStyle, width: 90 }} />
           <span style={{ fontSize: 13, color: "var(--color-text-tertiary)" }}>個</span>
@@ -519,7 +535,7 @@ const AITab = ({ db, isMobile }) => {
   const keyCard = (
     <Card>
       <CardTitle>Gemini API キー</CardTitle>
-      <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
+      <input className="app-control" type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
         placeholder="AIza..."
         style={{ ...inputStyle, fontFamily: "var(--font-mono)", fontSize: 13, marginBottom: 8 }} />
       <Btn onClick={saveKey} primary={keySaved} full>{keySaved ? "保存済み ✓" : "保存"}</Btn>
@@ -550,7 +566,7 @@ const AITab = ({ db, isMobile }) => {
     <Card>
       <CardTitle>質問・結果</CardTitle>
       <div style={{ display: "flex", gap: 8, marginBottom: "1rem" }}>
-        <textarea value={prompt} onChange={e => setPrompt(e.target.value)}
+        <textarea className="app-control" value={prompt} onChange={e => setPrompt(e.target.value)}
           placeholder="AIへの質問を自由入力..." rows={2}
           style={{ ...inputStyle, flex: 1, resize: "vertical" }} />
         <Btn onClick={() => { if (prompt.trim()) callGemini(prompt); }} primary
