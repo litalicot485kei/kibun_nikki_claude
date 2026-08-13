@@ -651,7 +651,7 @@ export default function App() {
   const { msg, vis, show } = useToast();
 
   return (
-    <div style={{ maxWidth: isMobile ? "100%" : 1100, margin: "0 auto", padding: isMobile ? "0.75rem 0.9rem 5rem" : "1rem 1.5rem 3rem" }}>
+    <div style={{ maxWidth: isMobile ? "100%" : 1400, margin: "0 auto", padding: isMobile ? "0.75rem 0.9rem 5rem" : "1rem 2.5rem 3rem" }}>
       {/* header */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
