@@ -34,11 +34,14 @@ const scoreLabel = (v) => {
 const LS_KEY = "healthdb_v2";
 const GK_KEY = "gemini_key_v2";
 const EMPTY_FORM = {
-  mind: "", body: "", headache: false, nausea: false, nap: false,
+  mind: 5, body: 5, headache: false, nausea: false, nap: false,
   sleepStart: "", sleepEnd: "", sleepScore: 50, sweetCount: 0, summary: "",
   // 食事（旧データにないときは "" として扱う・互換性確保）
   mealBreakfast: "", mealLunch: "", mealDinner: "",
 };
+
+// 旧データ(文字列)との互換: 数値に変換できなければ5を返す
+const toScore10 = (v) => { const n = parseInt(v); return (!isNaN(n) && n >= 1 && n <= 10) ? n : 5; };
 
 // ── responsive hook ────────────────────────────────────
 const useIsMobile = () => {
@@ -142,9 +145,41 @@ const StatCard = ({ label, value, sub, accent }) => (
 );
 
 // ── RECORD TAB ─────────────────────────────────────────
+// 1〜10スライダー用のラベル
+const moodLabel = (v) => {
+  if (v >= 9) return { text: "最高！", col: "#3B6D11" };
+  if (v >= 7) return { text: "良い",   col: "#185FA5" };
+  if (v >= 5) return { text: "普通",   col: "#854F0B" };
+  if (v >= 3) return { text: "悪い",   col: "#A32D2D" };
+  return             { text: "最悪",   col: "#7B1010" };
+};
+
+const ScoreSlider = ({ label, value, onChange }) => {
+  const lbl = moodLabel(value);
+  return (
+    <Field label={label}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+        <span style={{ fontSize: 24, fontWeight: 500, color: "var(--color-text-primary)", minWidth: 28 }}>{value}</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: lbl.col }}>{lbl.text}</span>
+        <span style={{ fontSize: 12, color: "var(--color-text-tertiary)", marginLeft: "auto" }}>1 〜 10</span>
+      </div>
+      <input type="range" min={1} max={10} step={1} value={value}
+        onChange={(e) => onChange(+e.target.value)}
+        style={{ width: "100%" }} />
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--color-text-tertiary)", marginTop: 2 }}>
+        <span>最悪</span><span>最高</span>
+      </div>
+    </Field>
+  );
+};
+
 const RecordTab = ({ db, setDb, toast, isMobile }) => {
   const today = todayStr();
-  const [form, setForm] = useState(() => db[today] ? { ...EMPTY_FORM, ...db[today] } : { ...EMPTY_FORM });
+  const [form, setForm] = useState(() => {
+    const savedEntry = db[today];
+    if (!savedEntry) return { ...EMPTY_FORM };
+    return { ...EMPTY_FORM, ...savedEntry, mind: toScore10(savedEntry.mind), body: toScore10(savedEntry.body) };
+  });
   const sleepH = useMemo(() => calcSleepHours(form.sleepStart, form.sleepEnd), [form.sleepStart, form.sleepEnd]);
   const sl = scoreLabel(form.sleepScore);
   const saved = !!db[today];
@@ -175,12 +210,16 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
   const condCard = (
     <Card>
       <CardTitle>心・体の状態</CardTitle>
-      <Field label="心の状態">
-        <Textarea value={form.mind} onChange={upd("mind")} placeholder="今日の気分、感情など..." rows={isMobile ? 3 : 4} />
-      </Field>
-      <Field label="体の状態">
-        <Textarea value={form.body} onChange={upd("body")} placeholder="体の調子、疲れ具合など..." rows={isMobile ? 3 : 4} />
-      </Field>
+      <ScoreSlider
+        label="心の状態"
+        value={form.mind}
+        onChange={(v) => setForm(f => ({ ...f, mind: v }))}
+      />
+      <ScoreSlider
+        label="体の状態"
+        value={form.body}
+        onChange={(v) => setForm(f => ({ ...f, body: v }))}
+      />
       <Field label="症状" style={{ marginBottom: 0 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Toggle checked={form.headache} onChange={upd("headache")} label="頭痛" />
