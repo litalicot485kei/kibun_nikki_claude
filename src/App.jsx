@@ -449,7 +449,7 @@ const GraphTab = ({ db, isMobile }) => {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: "1rem", alignItems: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "1rem", alignItems: "start" }}>
       <div>
         {chartTabsSidebar}
         <Card style={{ padding: "0.75rem" }}>
@@ -564,7 +564,7 @@ const AITab = ({ db, isMobile }) => {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: "1rem", alignItems: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: "1rem", alignItems: "start" }}>
       <div>{keyCard}{presetCard}</div>
       {mainCard}
     </div>
@@ -670,7 +670,7 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: "1rem", alignItems: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: "1rem", alignItems: "start" }}>
       <div>{importCard}{exportCard}</div>
       {listCard}
     </div>
@@ -699,7 +699,7 @@ export default function App() {
   const { msg, vis, show } = useToast();
 
   return (
-    <div style={{ maxWidth: isMobile ? "100%" : 1600, margin: "0 auto", padding: isMobile ? "0.75rem 0.9rem 5rem" : "1.25rem 3rem 3rem" }}>
+    <div style={{ width: "100%", padding: isMobile ? "0.75rem 0.9rem 5rem" : "1.25rem 3rem 3rem" }}>
       {/* header */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
