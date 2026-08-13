@@ -31,7 +31,7 @@ const scoreLabel = (v) => {
   return             { text: "悪い",     bg: "#FCEBEB", col: "#A32D2D" };
 };
 
-const LS_KEY = "healthdb_v2";
+const LS_KEY = "healthdb_v3";  // v3: {version,db,ai} 形式
 const GK_KEY = "gemini_key_v2";
 const EMPTY_FORM = {
   mind: 5, body: 5, headache: false, nausea: false, nap: false,
@@ -190,7 +190,7 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
     const entry = { ...form, date: today, sleepHours: sleepH, savedAt: new Date().toISOString() };
     const next = { ...db, [today]: entry };
     setDb(next);
-    localStorage.setItem(LS_KEY, JSON.stringify(next));
+    localStorage.setItem(LS_KEY, JSON.stringify({ version: 3, db: next }));
     toast("記録を保存しました ✓");
   };
 
@@ -577,7 +577,9 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
     Object.values(db).sort((a, b) => a.date < b.date ? -1 : 1).reverse(), [db]);
 
   const exportJSON = () => {
-    const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
+    // v3形式 {version, db} で保存（既存アプリと互換）
+    const payload = { version: 3, db };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = `health_journal_${todayStr()}.json`; a.click();
   };
@@ -587,10 +589,12 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const data = JSON.parse(ev.target.result);
-        const next = { ...db, ...data };
-        setDb(next); localStorage.setItem(LS_KEY, JSON.stringify(next));
-        toast(`${Object.keys(data).length}件のデータを読み込みました`);
+        const raw = JSON.parse(ev.target.result);
+        // v3形式 { version, db } とフラット形式の両方に対応
+        const incoming = (raw.version && raw.db) ? raw.db : raw;
+        const next = { ...db, ...incoming };
+        setDb(next); localStorage.setItem(LS_KEY, JSON.stringify({ version: 3, db: next }));
+        toast(`${Object.keys(incoming).length}件のデータを読み込みました`);
       } catch { toast("JSONの読み込みに失敗しました"); }
       e.target.value = "";
     };
@@ -600,13 +604,13 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
   const delEntry = (date) => {
     if (!confirm(`${date}のデータを削除しますか？`)) return;
     const next = { ...db }; delete next[date];
-    setDb(next); localStorage.setItem(LS_KEY, JSON.stringify(next));
+    setDb(next); localStorage.setItem(LS_KEY, JSON.stringify({ version: 3, db: next }));
     toast("削除しました");
   };
 
   const clearAll = () => {
     if (!confirm("全データを削除します。この操作は取り消せません。")) return;
-    setDb({}); localStorage.removeItem(LS_KEY); toast("全データを削除しました");
+    setDb({}); localStorage.setItem(LS_KEY, JSON.stringify({ version: 3, db: {} })); toast("全データを削除しました");
   };
 
   const importCard = (
@@ -685,12 +689,17 @@ export default function App() {
   const [tab, setTab] = useState("record");
   const isMobile = useIsMobile();
   const [db, setDb] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch { return {}; }
+    try {
+      const raw = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+      // v3形式 { version, db, ... } に対応
+      if (raw.version && raw.db) return raw.db;
+      return raw;
+    } catch { return {}; }
   });
   const { msg, vis, show } = useToast();
 
   return (
-    <div style={{ maxWidth: isMobile ? "100%" : 1400, margin: "0 auto", padding: isMobile ? "0.75rem 0.9rem 5rem" : "1rem 2.5rem 3rem" }}>
+    <div style={{ maxWidth: isMobile ? "100%" : 1600, margin: "0 auto", padding: isMobile ? "0.75rem 0.9rem 5rem" : "1.25rem 3rem 3rem" }}>
       {/* header */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
