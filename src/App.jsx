@@ -478,12 +478,14 @@ const PRESETS = [
   { label: "傾向と提案",   prompt: "最近の傾向と今後1週間のアドバイスをください。" },
 ];
 
-const AITab = ({ db, isMobile }) => {
-  const [apiKey,   setApiKey]   = useState(() => localStorage.getItem(GK_KEY) || "");
-  const [keySaved, setKeySaved] = useState(false);
-  const [prompt,   setPrompt]   = useState("");
-  const [output,   setOutput]   = useState("ここにAIの解析結果が表示されます。");
-  const [loading,  setLoading]  = useState(false);
+const AITab = ({ db, isMobile, aiHistory, saveAiHistory }) => {
+  const [apiKey,    setApiKey]   = useState(() => localStorage.getItem(GK_KEY) || "");
+  const [keySaved,  setKeySaved] = useState(false);
+  const [prompt,    setPrompt]   = useState("");
+  const [output,    setOutput]   = useState("ここにAIの解析結果が表示されます。");
+  const [loading,   setLoading]  = useState(false);
+  const [showHist,  setShowHist] = useState(false);
+  const [selHist,   setSelHist]  = useState(null); // 履歴選択表示
 
   const saveKey = () => {
     localStorage.setItem(GK_KEY, apiKey);
@@ -494,7 +496,7 @@ const AITab = ({ db, isMobile }) => {
     if (!apiKey) { setOutput("Gemini APIキーを入力してください。"); return; }
     const entries = Object.values(db).sort((a, b) => a.date < b.date ? -1 : 1).slice(-30);
     if (!entries.length) { setOutput("データがありません。まず記録タブで入力してください。"); return; }
-    setLoading(true); setOutput("解析中...");
+    setLoading(true); setOutput("解析中..."); setSelHist(null);
     const sys = `あなたは健康データアナリストです。以下の日々の健康記録データをもとに、ユーザーの質問に日本語で丁寧に答えてください。\n\nデータ（直近30件）:\n${JSON.stringify(entries, null, 2)}`;
     try {
       const res = await fetch(
@@ -504,7 +506,12 @@ const AITab = ({ db, isMobile }) => {
       );
       if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || res.statusText); }
       const d = await res.json();
-      setOutput(d.candidates?.[0]?.content?.parts?.[0]?.text || "応答が空でした。");
+      const text = d.candidates?.[0]?.content?.parts?.[0]?.text || "応答が空でした。";
+      setOutput(text);
+      // 履歴に追加して保存
+      const newItem = { savedAt: new Date().toISOString(), prompt: p, output: text };
+      const nextHistory = [newItem, ...(aiHistory || [])].slice(0, 100); // 最大100件
+      saveAiHistory(nextHistory, apiKey);
     } catch (e) { setOutput("エラー: " + e.message); }
     finally { setLoading(false); }
   };
@@ -529,13 +536,55 @@ const AITab = ({ db, isMobile }) => {
         display: "flex",
         flexDirection: isMobile ? "row" : "column",
         flexWrap: isMobile ? "wrap" : "nowrap",
-        gap: isMobile ? 6 : 6,
+        gap: 6,
       }}>
         {PRESETS.map(p => (
           <Btn key={p.label} onClick={() => callGemini(p.prompt)} disabled={loading}
             full={!isMobile}>{p.label}</Btn>
         ))}
       </div>
+    </Card>
+  );
+
+  const histCard = (
+    <Card>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.85rem" }}>
+        <CardTitle style={{ marginBottom: 0 }}>解析履歴 ({(aiHistory || []).length}件)</CardTitle>
+        <button onClick={() => setShowHist(v => !v)} style={{
+          fontSize: 12, color: "#185FA5", background: "none", border: "none", cursor: "pointer"
+        }}>{showHist ? "▲ 閉じる" : "▼ 展開"}</button>
+      </div>
+      {showHist && (
+        <div style={{ maxHeight: 260, overflowY: "auto" }}>
+          {(aiHistory || []).length === 0
+            ? <div style={{ fontSize: 13, color: "var(--color-text-tertiary)" }}>履歴がありません</div>
+            : (aiHistory || []).map((h, i) => (
+              <div key={i}
+                onClick={() => setSelHist(selHist === i ? null : i)}
+                style={{
+                  padding: "8px 10px", borderRadius: 6, marginBottom: 4, cursor: "pointer",
+                  background: selHist === i ? "#E6F1FB" : "var(--color-background-secondary)",
+                  border: "0.5px solid var(--color-border-tertiary)",
+                }}>
+                <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginBottom: 2 }}>
+                  {new Date(h.savedAt).toLocaleString("ja-JP")}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary)",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {h.prompt}
+                </div>
+                {selHist === i && (
+                  <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.7,
+                    color: "var(--color-text-primary)", whiteSpace: "pre-wrap",
+                    borderTop: "0.5px solid var(--color-border-tertiary)", paddingTop: 8 }}>
+                    {h.output}
+                  </div>
+                )}
+              </div>
+            ))
+          }
+        </div>
+      )}
     </Card>
   );
 
@@ -555,30 +604,30 @@ const AITab = ({ db, isMobile }) => {
         minHeight: isMobile ? 160 : 240,
         color: loading ? "var(--color-text-tertiary)" : "var(--color-text-primary)",
         whiteSpace: "pre-wrap",
-      }}>{output}</div>
+      }}>{selHist !== null ? aiHistory[selHist]?.output : output}</div>
     </Card>
   );
 
   if (isMobile) {
-    return <div>{keyCard}{presetCard}{mainCard}</div>;
+    return <div>{keyCard}{presetCard}{mainCard}{histCard}</div>;
   }
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: "1rem", alignItems: "start" }}>
-      <div>{keyCard}{presetCard}</div>
+      <div>{keyCard}{presetCard}{histCard}</div>
       {mainCard}
     </div>
   );
 };
 
 // ── DATA TAB ───────────────────────────────────────────
-const DataTab = ({ db, setDb, toast, isMobile }) => {
+const DataTab = ({ db, setDb, toast, isMobile, store, setStore }) => {
   const entries = useMemo(() =>
     Object.values(db).sort((a, b) => a.date < b.date ? -1 : 1).reverse(), [db]);
 
   const exportJSON = () => {
-    // v3形式 {version, db} で保存（既存アプリと互換）
-    const payload = { version: 3, db };
+    // v3形式 {version, db, ai} で保存（AI履歴も含める）
+    const payload = store || { version: 3, db, ai: { history: [] } };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = `health_journal_${todayStr()}.json`; a.click();
@@ -590,11 +639,21 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
     reader.onload = (ev) => {
       try {
         const raw = JSON.parse(ev.target.result);
-        // v3形式 { version, db } とフラット形式の両方に対応
-        const incoming = (raw.version && raw.db) ? raw.db : raw;
-        const next = { ...db, ...incoming };
-        setDb(next); localStorage.setItem(LS_KEY, JSON.stringify({ version: 3, db: next }));
-        toast(`${Object.keys(incoming).length}件のデータを読み込みました`);
+        // v3形式 { version, db, ai } とフラット形式の両方に対応
+        const incomingDb = (raw.version && raw.db) ? raw.db : raw;
+        const incomingAi = raw.ai || { history: [] };
+        const nextDb = { ...db, ...incomingDb };
+        // AI履歴はマージ（重複排除: savedAtで判定）
+        const existingAi = store?.ai || { history: [] };
+        const existingSavedAts = new Set((existingAi.history || []).map(h => h.savedAt));
+        const mergedHistory = [
+          ...(existingAi.history || []),
+          ...(incomingAi.history || []).filter(h => !existingSavedAts.has(h.savedAt))
+        ].sort((a, b) => b.savedAt.localeCompare(a.savedAt)).slice(0, 100);
+        const nextStore = { version: 3, db: nextDb, ai: { ...incomingAi, history: mergedHistory } };
+        setStore(nextStore);
+        localStorage.setItem(LS_KEY, JSON.stringify(nextStore));
+        toast(`${Object.keys(incomingDb).length}件のデータ・${(incomingAi.history||[]).length}件のAI履歴を読み込みました`);
       } catch { toast("JSONの読み込みに失敗しました"); }
       e.target.value = "";
     };
@@ -610,7 +669,8 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
 
   const clearAll = () => {
     if (!confirm("全データを削除します。この操作は取り消せません。")) return;
-    setDb({}); localStorage.setItem(LS_KEY, JSON.stringify({ version: 3, db: {} })); toast("全データを削除しました");
+    const next = { version: 3, db: {}, ai: store?.ai || { history: [] } };
+    setStore(next); localStorage.setItem(LS_KEY, JSON.stringify(next)); toast("全データを削除しました");
   };
 
   const importCard = (
@@ -688,14 +748,37 @@ const TABS = [
 export default function App() {
   const [tab, setTab] = useState("record");
   const isMobile = useIsMobile();
-  const [db, setDb] = useState(() => {
+
+  // v3形式 { version, db, ai } を一括管理
+  const loadStore = () => {
     try {
       const raw = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
-      // v3形式 { version, db, ... } に対応
-      if (raw.version && raw.db) return raw.db;
-      return raw;
-    } catch { return {}; }
-  });
+      if (raw.version && raw.db) return raw;
+      // フラット形式の旧データは db として扱う
+      return { version: 3, db: raw, ai: { apiKey: "", history: [] } };
+    } catch { return { version: 3, db: {}, ai: { apiKey: "", history: [] } }; }
+  };
+
+  const [store, setStore] = useState(loadStore);
+  const db = store.db;
+  const aiHistory = store.ai?.history || [];
+
+  const setDb = (nextDb) => {
+    setStore(s => {
+      const next = { ...s, db: nextDb };
+      localStorage.setItem(LS_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const saveAiHistory = (history, apiKey) => {
+    setStore(s => {
+      const next = { ...s, ai: { ...(s.ai || {}), apiKey, history } };
+      localStorage.setItem(LS_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
   const { msg, vis, show } = useToast();
 
   return (
@@ -725,8 +808,8 @@ export default function App() {
       {/* content */}
       {tab === "record" && <RecordTab db={db} setDb={setDb} toast={show} isMobile={isMobile} />}
       {tab === "graph"  && <GraphTab  db={db} isMobile={isMobile} />}
-      {tab === "ai"     && <AITab     db={db} isMobile={isMobile} />}
-      {tab === "data"   && <DataTab   db={db} setDb={setDb} toast={show} isMobile={isMobile} />}
+      {tab === "ai"     && <AITab     db={db} isMobile={isMobile} aiHistory={aiHistory} saveAiHistory={saveAiHistory} />}
+      {tab === "data"   && <DataTab   db={db} setDb={setDb} toast={show} isMobile={isMobile} store={store} setStore={setStore} />}
 
       {/* mobile bottom nav */}
       {isMobile && (
