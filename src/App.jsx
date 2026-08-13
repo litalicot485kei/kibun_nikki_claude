@@ -18,13 +18,6 @@ const calcSleepHours = (start, end) => {
   return parseFloat((diff / 60).toFixed(2));
 };
 
-const normalizeSleepHours = (value) => {
-  if (value === "" || value == null) return null;
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return null;
-  return Math.max(0, parseFloat(parsed.toFixed(2)));
-};
-
 const fmtSleep = (h) => {
   if (h == null) return "—";
   const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
@@ -32,88 +25,19 @@ const fmtSleep = (h) => {
 };
 
 const scoreLabel = (v) => {
-  if (v >= 90) return { text: "とてもいい", bg: "#EAF3DE", col: "#3B6D11" };
-  if (v >= 80) return { text: "まあまあいい", bg: "#E6F1FB", col: "#185FA5" };
-  if (v >= 60) return { text: "普通",       bg: "#FAEEDA", col: "#854F0B" };
-  return             { text: "悪い",       bg: "#FCEBEB", col: "#A32D2D" };
-};
-
-const feelingLabel = (v) => {
-  if (v >= 9) return { text: "とても良い", bg: "#EAF3DE", col: "#3B6D11" };
-  if (v >= 7) return { text: "良い",       bg: "#E6F1FB", col: "#185FA5" };
-  if (v >= 5) return { text: "ふつう",     bg: "#FAEEDA", col: "#854F0B" };
-  if (v >= 3) return { text: "つらい",     bg: "#FBEED9", col: "#A86400" };
-  return             { text: "かなりつらい", bg: "#FCEBEB", col: "#A32D2D" };
-};
-
-const badgeStyle = (bg, col, width = 126) => ({
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width,
-  padding: "3px 11px",
-  borderRadius: 20,
-  fontSize: 13,
-  fontWeight: 500,
-  background: bg,
-  color: col,
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  boxSizing: "border-box",
-});
-
-const normalizeSliderValue = (value, fallback = 5) => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  const normalized = parsed > 10 ? Math.round(parsed / 10) : Math.round(parsed);
-  return Math.max(1, Math.min(10, normalized));
+  if (v >= 80) return { text: "良好",     bg: "#EAF3DE", col: "#3B6D11" };
+  if (v >= 60) return { text: "まあまあ", bg: "#FAEEDA", col: "#854F0B" };
+  if (v >= 40) return { text: "普通",     bg: "#E6F1FB", col: "#185FA5" };
+  return             { text: "悪い",     bg: "#FCEBEB", col: "#A32D2D" };
 };
 
 const LS_KEY = "healthdb_v2";
 const GK_KEY = "gemini_key_v2";
-const AI_PROMPT_KEY = "gemini_prompt_v1";
-const AI_OUTPUT_KEY = "gemini_output_v1";
-const AI_HISTORY_KEY = "gemini_history_v1";
-const AI_OUTPUT_DEFAULT = "ここにAIの解析結果が表示されます。";
 const EMPTY_FORM = {
-  mind: 5, body: 5, headache: false, nausea: false, nap: false,
-  sleepStart: "", sleepEnd: "", sleepHours: "", sleepScore: 50, sweetCount: 0, summary: ""
-};
-
-const readAIState = () => ({
-  apiKey: localStorage.getItem(GK_KEY) || "",
-  prompt: localStorage.getItem(AI_PROMPT_KEY) || "",
-  output: localStorage.getItem(AI_OUTPUT_KEY) || "",
-  history: (() => {
-    try { return JSON.parse(localStorage.getItem(AI_HISTORY_KEY) || "[]"); }
-    catch { return []; }
-  })(),
-});
-
-const escapeCsv = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-
-const downloadTextFile = (filename, content, type = "text/plain;charset=utf-8") => {
-  const blob = new Blob([content], { type });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
-};
-
-const writeAIState = ({ apiKey = "", prompt = "", output = "", history = [] } = {}) => {
-  if (apiKey) localStorage.setItem(GK_KEY, apiKey);
-  else localStorage.removeItem(GK_KEY);
-
-  if (prompt) localStorage.setItem(AI_PROMPT_KEY, prompt);
-  else localStorage.removeItem(AI_PROMPT_KEY);
-
-  if (output && output !== AI_OUTPUT_DEFAULT) localStorage.setItem(AI_OUTPUT_KEY, output);
-  else localStorage.removeItem(AI_OUTPUT_KEY);
-
-  if (Array.isArray(history) && history.length) localStorage.setItem(AI_HISTORY_KEY, JSON.stringify(history));
-  else localStorage.removeItem(AI_HISTORY_KEY);
+  mind: "", body: "", headache: false, nausea: false, nap: false,
+  sleepStart: "", sleepEnd: "", sleepScore: 50, sweetCount: 0, summary: "",
+  // 食事（旧データにないときは "" として扱う・互換性確保）
+  mealBreakfast: "", mealLunch: "", mealDinner: "",
 };
 
 // ── responsive hook ────────────────────────────────────
@@ -137,14 +61,11 @@ const useToast = () => {
 
 // ── design tokens ──────────────────────────────────────
 const inputStyle = {
-  width: "100%",
-  fontSize: 14,
-  padding: "10px 12px",
-  borderRadius: 12,
-  color: "var(--color-text-primary)",
-  fontFamily: "var(--font-sans)",
-  outline: "none",
-  boxSizing: "border-box",
+  width: "100%", fontSize: 14, padding: "8px 10px",
+  border: "0.5px solid var(--color-border-secondary)",
+  borderRadius: 8, background: "var(--color-background-secondary)",
+  color: "var(--color-text-primary)", fontFamily: "var(--font-sans)",
+  outline: "none", boxSizing: "border-box",
 };
 
 // ── base components ────────────────────────────────────
@@ -174,18 +95,12 @@ const Field = ({ label, children, style }) => (
 );
 
 const Textarea = ({ value, onChange, placeholder, rows = 3 }) => (
-  <textarea
-    className="app-control"
-    value={value}
-    onChange={onChange}
-    placeholder={placeholder}
-    rows={rows}
-    style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }}
-  />
+  <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows}
+    style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
 );
 
 const TimeInput = ({ value, onChange }) => (
-  <input className="app-control" type="time" value={value} onChange={onChange} style={inputStyle} />
+  <input type="time" value={value} onChange={onChange} style={inputStyle} />
 );
 
 const Toggle = ({ checked, onChange, label }) => (
@@ -229,30 +144,15 @@ const StatCard = ({ label, value, sub, accent }) => (
 // ── RECORD TAB ─────────────────────────────────────────
 const RecordTab = ({ db, setDb, toast, isMobile }) => {
   const today = todayStr();
-  const [form, setForm] = useState(() => db[today]
-    ? {
-        ...EMPTY_FORM,
-        ...db[today],
-        mind: normalizeSliderValue(db[today].mind),
-        body: normalizeSliderValue(db[today].body),
-        sleepHours: db[today].sleepHours ?? calcSleepHours(db[today].sleepStart, db[today].sleepEnd) ?? "",
-      }
-    : { ...EMPTY_FORM });
-  const sleepH = useMemo(() => {
-    const manualSleep = normalizeSleepHours(form.sleepHours);
-    if (manualSleep != null) return manualSleep;
-    return calcSleepHours(form.sleepStart, form.sleepEnd);
-  }, [form.sleepStart, form.sleepEnd, form.sleepHours]);
+  const [form, setForm] = useState(() => db[today] ? { ...EMPTY_FORM, ...db[today] } : { ...EMPTY_FORM });
+  const sleepH = useMemo(() => calcSleepHours(form.sleepStart, form.sleepEnd), [form.sleepStart, form.sleepEnd]);
   const sl = scoreLabel(form.sleepScore);
-  const feeling = feelingLabel(form.mind);
-  const bodyFeeling = feelingLabel(form.body);
   const saved = !!db[today];
 
   const upd = (k) => (e) => setForm(f => ({ ...f, [k]: e.target ? e.target.value : e }));
 
   const save = () => {
-    const entrySleepHours = normalizeSleepHours(form.sleepHours);
-    const entry = { ...form, date: today, sleepHours: entrySleepHours ?? sleepH, savedAt: new Date().toISOString() };
+    const entry = { ...form, date: today, sleepHours: sleepH, savedAt: new Date().toISOString() };
     const next = { ...db, [today]: entry };
     setDb(next);
     localStorage.setItem(LS_KEY, JSON.stringify(next));
@@ -276,38 +176,10 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
     <Card>
       <CardTitle>心・体の状態</CardTitle>
       <Field label="心の状態">
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <input
-            className="app-range"
-            type="range"
-            min={1}
-            max={10}
-            step={1}
-            value={form.mind}
-            onChange={(e) => setForm(f => ({ ...f, mind: +e.target.value }))}
-            style={{ flex: 1 }}
-          />
-          <span style={badgeStyle(feeling.bg, feeling.col)}>
-            {form.mind}/10 · {feeling.text}
-          </span>
-        </div>
+        <Textarea value={form.mind} onChange={upd("mind")} placeholder="今日の気分、感情など..." rows={isMobile ? 3 : 4} />
       </Field>
       <Field label="体の状態">
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <input
-            className="app-range"
-            type="range"
-            min={1}
-            max={10}
-            step={1}
-            value={form.body}
-            onChange={(e) => setForm(f => ({ ...f, body: +e.target.value }))}
-            style={{ flex: 1 }}
-          />
-          <span style={badgeStyle(bodyFeeling.bg, bodyFeeling.col)}>
-            {form.body}/10 · {bodyFeeling.text}
-          </span>
-        </div>
+        <Textarea value={form.body} onChange={upd("body")} placeholder="体の調子、疲れ具合など..." rows={isMobile ? 3 : 4} />
       </Field>
       <Field label="症状" style={{ marginBottom: 0 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -321,8 +193,8 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
 
   const summaryCard = (
     <Card>
-      <CardTitle>昨日のまとめ</CardTitle>
-      <Textarea value={form.summary} onChange={upd("summary")} placeholder="昨日を振り返って..." rows={isMobile ? 4 : 6} />
+      <CardTitle>今日のまとめ</CardTitle>
+      <Textarea value={form.summary} onChange={upd("summary")} placeholder="今日を振り返って..." rows={isMobile ? 4 : 6} />
     </Card>
   );
 
@@ -339,33 +211,18 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
       }}>
         睡眠時間：<span style={{ fontSize: 18, fontWeight: 500, color: "var(--color-text-primary)" }}>{fmtSleep(sleepH)}</span>
       </div>
-      <Field label="睡眠時間（実際に眠っていた時間）">
-        <input
-          className="app-control"
-          type="number"
-          min={0}
-          step={0.1}
-          value={form.sleepHours}
-          onChange={upd("sleepHours")}
-          placeholder="例: 7.5"
-          style={{ ...inputStyle, width: 120 }}
-        />
-        <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 4 }}>
-          就寝・起床時刻は参考用です。空欄なら時刻差から自動計算します。
-        </div>
-      </Field>
       <Field label="睡眠スコア" style={{ marginBottom: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <input className="app-range" type="range" min={0} max={100} step={1} value={form.sleepScore}
-            onChange={(e) => setForm(f => ({ ...f, sleepScore: +e.target.value }))}
-            style={{ flex: 1 }} />
-          <span style={badgeStyle("var(--color-background-secondary)", "var(--color-text-primary)", 72)}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 22, fontWeight: 500, color: "var(--color-text-primary)", minWidth: 36 }}>
             {form.sleepScore}
           </span>
-          <span style={badgeStyle(sl.bg, sl.col, 126)}>
+          <span style={{ padding: "3px 11px", borderRadius: 20, fontSize: 13, fontWeight: 500, background: sl.bg, color: sl.col }}>
             {sl.text}
           </span>
         </div>
+        <input type="range" min={0} max={100} step={1} value={form.sleepScore}
+          onChange={(e) => setForm(f => ({ ...f, sleepScore: +e.target.value }))}
+          style={{ width: "100%" }} />
       </Field>
     </Card>
   );
@@ -373,9 +230,23 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
   const foodCard = (
     <Card>
       <CardTitle>食事</CardTitle>
+      {[
+        { key: "mealBreakfast", label: "🌅 朝食", placeholder: "例：トースト、ヨーグルト、コーヒー" },
+        { key: "mealLunch",     label: "☀️ 昼食", placeholder: "例：定食、ラーメン、サラダ" },
+        { key: "mealDinner",    label: "🌙 夕食", placeholder: "例：ご飯、味噌汁、焼き魚" },
+      ].map(({ key, label, placeholder }) => (
+        <Field key={key} label={label}>
+          <Textarea
+            value={form[key] ?? ""}
+            onChange={(e) => setForm(f => ({ ...f, [key]: e.target.value }))}
+            placeholder={placeholder}
+            rows={2}
+          />
+        </Field>
+      ))}
       <Field label="甘い食べ物・飲み物の数" style={{ marginBottom: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <input className="app-control" type="number" value={form.sweetCount} min={0} max={99}
+          <input type="number" value={form.sweetCount} min={0} max={99}
             onChange={(e) => setForm(f => ({ ...f, sweetCount: +e.target.value }))}
             style={{ ...inputStyle, width: 90 }} />
           <span style={{ fontSize: 13, color: "var(--color-text-tertiary)" }}>個</span>
@@ -562,80 +433,22 @@ const GraphTab = ({ db, isMobile }) => {
 
 // ── AI TAB ─────────────────────────────────────────────
 const PRESETS = [
-  { label: "昨日の全体サマリー", prompt: "昨日までの全体的な健康状態のサマリーと気になる点を教えてください。" },
-  { label: "昨日の睡眠分析",     prompt: "昨日の睡眠パターンを分析し、改善アドバイスをください。" },
-  { label: "昨日の症状と相関",   prompt: "昨日の頭痛や吐き気などの症状と睡眠・食事の相関を分析してください。" },
-  { label: "昨日の傾向と提案",   prompt: "昨日までの傾向と今後1週間のアドバイスをください。" },
+  { label: "全体サマリー", prompt: "全体的な健康状態のサマリーと気になる点を教えてください。" },
+  { label: "睡眠分析",     prompt: "睡眠パターンを分析し、改善アドバイスをください。" },
+  { label: "症状と相関",   prompt: "頭痛や吐き気などの症状と睡眠・食事の相関を分析してください。" },
+  { label: "傾向と提案",   prompt: "最近の傾向と今後1週間のアドバイスをください。" },
 ];
 
 const AITab = ({ db, isMobile }) => {
   const [apiKey,   setApiKey]   = useState(() => localStorage.getItem(GK_KEY) || "");
   const [keySaved, setKeySaved] = useState(false);
-  const [prompt,   setPrompt]   = useState(() => localStorage.getItem(AI_PROMPT_KEY) || "");
-  const [output,   setOutput]   = useState(() => localStorage.getItem(AI_OUTPUT_KEY) || AI_OUTPUT_DEFAULT);
-  const [history,  setHistory]  = useState(() => {
-    try { return JSON.parse(localStorage.getItem(AI_HISTORY_KEY) || "[]"); }
-    catch { return []; }
-  });
+  const [prompt,   setPrompt]   = useState("");
+  const [output,   setOutput]   = useState("ここにAIの解析結果が表示されます。");
   const [loading,  setLoading]  = useState(false);
 
   const saveKey = () => {
     localStorage.setItem(GK_KEY, apiKey);
     setKeySaved(true); setTimeout(() => setKeySaved(false), 2000);
-  };
-
-  useEffect(() => {
-    if (apiKey.trim()) localStorage.setItem(GK_KEY, apiKey);
-    else localStorage.removeItem(GK_KEY);
-  }, [apiKey]);
-
-  useEffect(() => {
-    if (prompt.trim()) localStorage.setItem(AI_PROMPT_KEY, prompt);
-    else localStorage.removeItem(AI_PROMPT_KEY);
-  }, [prompt]);
-
-  useEffect(() => {
-    if (output && output !== AI_OUTPUT_DEFAULT) {
-      localStorage.setItem(AI_OUTPUT_KEY, output);
-    } else {
-      localStorage.removeItem(AI_OUTPUT_KEY);
-    }
-  }, [output]);
-
-  useEffect(() => {
-    if (history.length) localStorage.setItem(AI_HISTORY_KEY, JSON.stringify(history));
-    else localStorage.removeItem(AI_HISTORY_KEY);
-  }, [history]);
-
-  const appendHistory = (nextOutput, nextPrompt = prompt) => {
-    const item = {
-      savedAt: new Date().toISOString(),
-      prompt: nextPrompt,
-      output: nextOutput,
-    };
-    setHistory((prev) => [item, ...prev].slice(0, 50));
-  };
-
-  const exportHistoryCSV = () => {
-    if (!history.length) return;
-    const header = ["savedAt", "prompt", "output"];
-    const rows = history.map((item) => [item.savedAt, item.prompt, item.output]);
-    const csv = [header, ...rows]
-      .map((row) => row.map(escapeCsv).join(","))
-      .join("\n");
-    downloadTextFile(`gemini_history_${todayStr()}.csv`, csv, "text/csv;charset=utf-8");
-  };
-
-  const clearHistory = () => {
-    if (!confirm("AI解析履歴を削除しますか？")) return;
-    setHistory([]);
-    setOutput(AI_OUTPUT_DEFAULT);
-    localStorage.removeItem(AI_HISTORY_KEY);
-    localStorage.removeItem(AI_OUTPUT_KEY);
-  };
-
-  const deleteHistoryItem = (savedAt) => {
-    setHistory((prev) => prev.filter((item) => item.savedAt !== savedAt));
   };
 
   const callGemini = async (p) => {
@@ -646,15 +459,13 @@ const AITab = ({ db, isMobile }) => {
     const sys = `あなたは健康データアナリストです。以下の日々の健康記録データをもとに、ユーザーの質問に日本語で丁寧に答えてください。\n\nデータ（直近30件）:\n${JSON.stringify(entries, null, 2)}`;
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
         { method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contents: [{ parts: [{ text: sys + "\n\nユーザーの質問: " + p }] }] }) }
       );
       if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || res.statusText); }
       const d = await res.json();
-      const nextOutput = d.candidates?.[0]?.content?.parts?.[0]?.text || "応答が空でした。";
-      setOutput(nextOutput);
-      appendHistory(nextOutput, p);
+      setOutput(d.candidates?.[0]?.content?.parts?.[0]?.text || "応答が空でした。");
     } catch (e) { setOutput("エラー: " + e.message); }
     finally { setLoading(false); }
   };
@@ -662,7 +473,7 @@ const AITab = ({ db, isMobile }) => {
   const keyCard = (
     <Card>
       <CardTitle>Gemini API キー</CardTitle>
-      <input className="app-control" type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
+      <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
         placeholder="AIza..."
         style={{ ...inputStyle, fontFamily: "var(--font-mono)", fontSize: 13, marginBottom: 8 }} />
       <Btn onClick={saveKey} primary={keySaved} full>{keySaved ? "保存済み ✓" : "保存"}</Btn>
@@ -693,7 +504,7 @@ const AITab = ({ db, isMobile }) => {
     <Card>
       <CardTitle>質問・結果</CardTitle>
       <div style={{ display: "flex", gap: 8, marginBottom: "1rem" }}>
-        <textarea className="app-control" value={prompt} onChange={e => setPrompt(e.target.value)}
+        <textarea value={prompt} onChange={e => setPrompt(e.target.value)}
           placeholder="AIへの質問を自由入力..." rows={2}
           style={{ ...inputStyle, flex: 1, resize: "vertical" }} />
         <Btn onClick={() => { if (prompt.trim()) callGemini(prompt); }} primary
@@ -706,42 +517,6 @@ const AITab = ({ db, isMobile }) => {
         color: loading ? "var(--color-text-tertiary)" : "var(--color-text-primary)",
         whiteSpace: "pre-wrap",
       }}>{output}</div>
-      {history.length > 0 && (
-        <div style={{ marginTop: "1rem" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
-            <CardTitle>会話履歴</CardTitle>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Btn onClick={exportHistoryCSV} small>CSV保存</Btn>
-              <Btn onClick={clearHistory} danger small>履歴削除</Btn>
-            </div>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: isMobile ? 380 : 460, overflowY: "auto", paddingRight: 4 }}>
-            {history.slice(0, isMobile ? 3 : 5).map((item, index) => (
-              <div key={`${item.savedAt}-${index}`} style={{
-                border: "0.5px solid var(--color-border-tertiary)",
-                borderRadius: 8,
-                padding: "10px 12px 12px",
-                background: "var(--color-background-secondary)",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>
-                    {new Date(item.savedAt).toLocaleString("ja-JP")}
-                  </div>
-                  <Btn onClick={() => deleteHistoryItem(item.savedAt)} danger small>削除</Btn>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ alignSelf: "flex-end", maxWidth: "92%", background: "#185FA5", color: "#fff", borderRadius: 16, borderTopRightRadius: 4, padding: "10px 12px", fontSize: 13, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
-                    {item.prompt || "（質問なし）"}
-                  </div>
-                  <div style={{ alignSelf: "flex-start", maxWidth: "92%", background: "var(--color-background-primary)", color: "var(--color-text-primary)", borderRadius: 16, borderTopLeftRadius: 4, padding: "10px 12px", fontSize: 13, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
-                    {item.output}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </Card>
   );
 
@@ -763,13 +538,7 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
     Object.values(db).sort((a, b) => a.date < b.date ? -1 : 1).reverse(), [db]);
 
   const exportJSON = () => {
-    const ai = readAIState();
-    const payload = {
-      version: 3,
-      db,
-      ai,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = `health_journal_${todayStr()}.json`; a.click();
   };
@@ -780,15 +549,9 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
     reader.onload = (ev) => {
       try {
         const data = JSON.parse(ev.target.result);
-        const importedDb = data?.db && typeof data.db === "object" ? data.db : data;
-        const next = { ...db, ...importedDb };
+        const next = { ...db, ...data };
         setDb(next); localStorage.setItem(LS_KEY, JSON.stringify(next));
-
-        if (data?.ai && typeof data.ai === "object") {
-          writeAIState(data.ai);
-        }
-
-        toast(`${Object.keys(importedDb).length}件のデータを読み込みました`);
+        toast(`${Object.keys(data).length}件のデータを読み込みました`);
       } catch { toast("JSONの読み込みに失敗しました"); }
       e.target.value = "";
     };
@@ -804,13 +567,7 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
 
   const clearAll = () => {
     if (!confirm("全データを削除します。この操作は取り消せません。")) return;
-    setDb({});
-    localStorage.removeItem(LS_KEY);
-    localStorage.removeItem(GK_KEY);
-    localStorage.removeItem(AI_PROMPT_KEY);
-    localStorage.removeItem(AI_OUTPUT_KEY);
-    localStorage.removeItem(AI_HISTORY_KEY);
-    toast("全データを削除しました");
+    setDb({}); localStorage.removeItem(LS_KEY); toast("全データを削除しました");
   };
 
   const importCard = (
@@ -856,6 +613,7 @@ const DataTab = ({ db, setDb, toast, isMobile }) => {
             <span style={{ color: "var(--color-text-secondary)", fontSize: 11 }}>
               {e.sleepHours != null ? e.sleepHours + "h" : "—"} ／ {e.sleepScore}点
               {e.headache ? " 頭痛" : ""}{e.nausea ? " 吐き気" : ""} 甘{e.sweetCount}個
+              {(e.mealBreakfast || e.mealLunch || e.mealDinner) ? " ／ 食事あり" : ""}
             </span>
             <Btn onClick={() => delEntry(e.date)} danger small>削除</Btn>
           </div>
