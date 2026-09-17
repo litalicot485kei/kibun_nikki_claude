@@ -35,7 +35,7 @@ const LS_KEY = "healthdb_v3";  // v3: {version,db,ai} 形式
 const GK_KEY = "gemini_key_v2";
 const EMPTY_FORM = {
   mind: 5, body: 5, headache: false, nausea: false, nap: false,
-  sleepStart: "", sleepEnd: "", sleepScore: 50, sweetCount: 0, summary: "",
+  sleepStart: "", sleepEnd: "", sleepScore: 50, wakeMinutes: 0, sweetCount: 0, summary: "",
   // 食事（旧データにないときは "" として扱う・互換性確保）
   mealBreakfast: "", mealLunch: "", mealDinner: "",
 };
@@ -187,7 +187,8 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
   const upd = (k) => (e) => setForm(f => ({ ...f, [k]: e.target ? e.target.value : e }));
 
   const save = () => {
-    const entry = { ...form, date: today, sleepHours: sleepH, savedAt: new Date().toISOString() };
+    const effectiveH = sleepH != null ? Math.max(0, parseFloat((sleepH - (form.wakeMinutes || 0) / 60).toFixed(2))) : null;
+    const entry = { ...form, date: today, sleepHours: sleepH, effectiveSleepHours: effectiveH, savedAt: new Date().toISOString() };
     const next = { ...db, [today]: entry };
     setDb(next);
     localStorage.setItem(LS_KEY, JSON.stringify({ version: 3, db: next }));
@@ -237,6 +238,11 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
     </Card>
   );
 
+  // 覚醒時間を引いた実効睡眠時間
+  const effectiveSleepH = sleepH != null
+    ? Math.max(0, parseFloat((sleepH - (form.wakeMinutes || 0) / 60).toFixed(2)))
+    : null;
+
   const sleepCard = (
     <Card>
       <CardTitle>睡眠</CardTitle>
@@ -244,11 +250,40 @@ const RecordTab = ({ db, setDb, toast, isMobile }) => {
         <Field label="就寝時間"><TimeInput value={form.sleepStart} onChange={upd("sleepStart")} /></Field>
         <Field label="起床時間"><TimeInput value={form.sleepEnd}   onChange={upd("sleepEnd")}   /></Field>
       </div>
+      {/* 覚醒時間 */}
+      <Field label="覚醒時間（途中で起きていた合計）">
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <input type="number" value={form.wakeMinutes ?? 0} min={0} max={480}
+            onChange={(e) => setForm(f => ({ ...f, wakeMinutes: +e.target.value }))}
+            style={{ ...inputStyle, width: 90 }} />
+          <span style={{ fontSize: 13, color: "var(--color-text-tertiary)" }}>分</span>
+        </div>
+      </Field>
+      {/* 睡眠時間サマリー */}
       <div style={{
         background: "var(--color-background-secondary)", borderRadius: 8,
-        padding: "9px 13px", fontSize: 13, color: "var(--color-text-secondary)", marginBottom: "1rem"
+        padding: "10px 13px", fontSize: 13, color: "var(--color-text-secondary)",
+        marginBottom: "1rem", display: "flex", flexDirection: "column", gap: 4,
       }}>
-        睡眠時間：<span style={{ fontSize: 18, fontWeight: 500, color: "var(--color-text-primary)" }}>{fmtSleep(sleepH)}</span>
+        <div>
+          床にいた時間：
+          <span style={{ fontWeight: 500, color: "var(--color-text-primary)" }}>{fmtSleep(sleepH)}</span>
+        </div>
+        {(form.wakeMinutes > 0) && (
+          <div>
+            実効睡眠時間：
+            <span style={{ fontSize: 17, fontWeight: 500, color: "#185FA5" }}>{fmtSleep(effectiveSleepH)}</span>
+            <span style={{ fontSize: 12, marginLeft: 6, color: "var(--color-text-tertiary)" }}>
+              （覚醒 {form.wakeMinutes}分 を除く）
+            </span>
+          </div>
+        )}
+        {(!form.wakeMinutes || form.wakeMinutes === 0) && (
+          <div>
+            睡眠時間：
+            <span style={{ fontSize: 17, fontWeight: 500, color: "var(--color-text-primary)" }}>{fmtSleep(sleepH)}</span>
+          </div>
+        )}
       </div>
       <Field label="睡眠スコア" style={{ marginBottom: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -331,7 +366,7 @@ const GraphTab = ({ db, isMobile }) => {
     Object.values(db).sort((a, b) => a.date < b.date ? -1 : 1).slice(-60), [db]);
 
   const stats = useMemo(() => {
-    const sleeps = entries.filter(e => e.sleepHours != null).map(e => e.sleepHours);
+    const sleeps = entries.filter(e => e.sleepHours != null).map(e => e.effectiveSleepHours ?? e.sleepHours);
     const scores = entries.map(e => e.sleepScore);
     return {
       days:         entries.length,
@@ -342,13 +377,14 @@ const GraphTab = ({ db, isMobile }) => {
   }, [entries]);
 
   const chartData = useMemo(() => entries.map(e => ({
-    label:    e.date.slice(5),
-    sleepH:   e.sleepHours,
-    score:    e.sleepScore,
-    sweet:    e.sweetCount,
-    headache: e.headache ? 1 : 0,
-    nausea:   e.nausea   ? 1 : 0,
-    nap:      e.nap      ? 1 : 0,
+    label:         e.date.slice(5),
+    sleepH:        e.sleepHours,
+    effectiveSleepH: e.effectiveSleepHours ?? e.sleepHours, // 旧データ互換
+    score:         e.sleepScore,
+    sweet:         e.sweetCount,
+    headache:      e.headache ? 1 : 0,
+    nausea:        e.nausea   ? 1 : 0,
+    nap:           e.nap      ? 1 : 0,
   })), [entries]);
 
   if (!entries.length) return (
@@ -405,7 +441,9 @@ const GraphTab = ({ db, isMobile }) => {
           <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
           <YAxis domain={[0, 12]} tick={{ fontSize: 11 }} unit="h" />
           <Tooltip formatter={(v) => v != null ? v + "h" : "—"} />
-          <Bar dataKey="sleepH" name="睡眠時間" fill="#B5D4F4" stroke="#185FA5" strokeWidth={0.5} radius={[3,3,0,0]} />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Bar dataKey="sleepH" name="床にいた時間" fill="#D0E8FA" stroke="#185FA5" strokeWidth={0.5} radius={[3,3,0,0]} />
+          <Bar dataKey="effectiveSleepH" name="実効睡眠時間" fill="#185FA5" stroke="#0C447C" strokeWidth={0.5} radius={[3,3,0,0]} />
         </BarChart>
       ) : chartType === "score" ? (
         <LineChart data={chartData} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
@@ -500,7 +538,7 @@ const AITab = ({ db, isMobile, aiHistory, saveAiHistory }) => {
     const sys = `あなたは健康データアナリストです。以下の日々の健康記録データをもとに、ユーザーの質問に日本語で丁寧に答えてください。\n\nデータ（直近30件）:\n${JSON.stringify(entries, null, 2)}`;
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-06-17:generateContent?key=${apiKey}`,
         { method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contents: [{ parts: [{ text: sys + "\n\nユーザーの質問: " + p }] }] }) }
       );
